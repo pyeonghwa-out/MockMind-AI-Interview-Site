@@ -11,7 +11,7 @@ import paymentRouter from "./routes/payment.route.js";
 dotenv.config()
 
 app.use(cors({
-    origin : "http://localhost:5173",
+    origin : "https://mockmindsite.onrender.com",
     credentials : true
 }))
 
