@@ -13,7 +13,7 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://mockmind-5vu6.onrender.com"
+  "https://mockmind-3z2t.onrender.com"
 ];
 
 app.use(cors({
