@@ -6,7 +6,7 @@
 
 An AI-powered interview preparation platform that generates personalized interview questions from your resume, conducts realistic technical and HR interview simulations, and provides intelligent feedback to accelerate career growth.
 
-🌐 **Live Demo:** https://mockmindsite.onrender.com/
+🌐 **Live Demo:** [https://mockmindsite.onrender.com/](https://mockmind-3z2t.onrender.com)
 
 </div>
 
