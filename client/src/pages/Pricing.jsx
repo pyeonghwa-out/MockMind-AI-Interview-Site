@@ -2,16 +2,35 @@ import React, { useState } from "react";
 import { FaArrowLeft, FaCheckCircle } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import axios from "axios"
-import { setUserData } from "../redux/userSlice"
-import { useDispatch } from "react-redux"
+import axios from "axios";
+import { setUserData } from "../redux/userSlice";
+import { useDispatch, useSelector } from "react-redux";
 import { ServerUrl } from "../App";
+import AuthModel from "../components/AuthModel";
+
+// Helper to load Razorpay checkout script if not already present
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 function Pricing() {
   const navigate = useNavigate();
-  const [selectedPlan, setSelectedPlan] = useState("free");
+  const [selectedPlan, setSelectedPlan] = useState("basic");
   const [loadingPlan, setLoadingPlan] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
   const dispatch = useDispatch();
+  const { userData } = useSelector((state) => state.user);
 
   const plans = [
     {
@@ -21,7 +40,7 @@ function Pricing() {
       credits: 100,
       description: "Perfect for beginners starting interview preparation.",
       features: [
-        "100 AI Interview Credits",
+        "100 AI Interview Credits (2 Interviews)",
         "Basic Performance Report",
         "Voice Interview Access",
         "Limited History Tracking",
@@ -35,7 +54,7 @@ function Pricing() {
       credits: 150,
       description: "Great for focused practice and skill improvement.",
       features: [
-        "150 AI Interview Credits",
+        "150 AI Interview Credits (3 Interviews)",
         "Detailed Feedback",
         "Performance Analytics",
         "Full Interview History",
@@ -48,7 +67,7 @@ function Pricing() {
       credits: 650,
       description: "Best value for serious job preparation.",
       features: [
-        "650 AI Interview Credits",
+        "650 AI Interview Credits (13 Interviews)",
         "Advanced AI Feedback",
         "Skill Trend Analysis",
         "Priority AI Processing",
@@ -58,11 +77,26 @@ function Pricing() {
   ];
 
   const handlePayment = async (plan) => {
+    // 1. Ensure user is logged in
+    if (!userData) {
+      setShowAuth(true);
+      return;
+    }
+
     try {
       setLoadingPlan(plan.id);
 
+      // 2. Load Razorpay script
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        alert("Unable to load Razorpay checkout SDK. Please verify your internet connection.");
+        setLoadingPlan(null);
+        return;
+      }
+
       const amount = plan.id === "basic" ? 100 : plan.id === "pro" ? 500 : 0;
 
+      // 3. Request backend order creation
       const result = await axios.post(
         ServerUrl + "/api/payment/order",
         {
@@ -70,31 +104,62 @@ function Pricing() {
           amount: amount,
           credits: plan.credits,
         },
-        { withCredentials: true },
+        { withCredentials: true }
       );
 
-      console.log(result.data);
+      console.log("Order created:", result.data);
 
+      const razorpayKey =
+        result.data.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
+
+      // 4. Configure Razorpay options
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: razorpayKey,
         amount: result.data.amount,
-        currency: "INR",
+        currency: result.data.currency || "INR",
         name: "MockMind",
         description: `${plan.name} - ${plan.credits} Credits`,
         order_id: result.data.id,
 
         handler: async function (response) {
-          const verifypay = await axios.post(
-            ServerUrl + "/api/payment/verify",
-            response,
-            { withCredentials: true },
-          );
+          try {
+            console.log("Payment response:", response);
 
-          dispatch(setUserData(verifypay.data.user));
+            const verifypay = await axios.post(
+              ServerUrl + "/api/payment/verify",
+              response,
+              { withCredentials: true }
+            );
 
-          alert("Payment Successful 🎉 Credits Added!");
+            console.log("Verification response:", verifypay.data);
 
-          navigate("/");
+            if (verifypay.data.user) {
+              dispatch(setUserData(verifypay.data.user));
+            }
+
+            alert("Payment Successful 🎉 Credits Added!");
+            navigate("/");
+          } catch (verifyError) {
+            console.error("Verification error:", verifyError);
+            const msg =
+              verifyError.response?.data?.message ||
+              "Failed to verify payment with server";
+            alert(msg);
+          } finally {
+            setLoadingPlan(null);
+          }
+        },
+
+        prefill: {
+          name: userData?.name || "",
+          email: userData?.email || "",
+        },
+
+        modal: {
+          ondismiss: function () {
+            console.log("Razorpay checkout modal closed");
+            setLoadingPlan(null);
+          },
         },
 
         theme: {
@@ -104,23 +169,34 @@ function Pricing() {
 
       const rzp = new window.Razorpay(options);
 
+      rzp.on("payment.failed", function (failResponse) {
+        console.error("Razorpay payment failed:", failResponse.error);
+        const failMsg =
+          failResponse.error?.description ||
+          failResponse.error?.reason ||
+          "Payment processing failed";
+        alert(`Payment Failed: ${failMsg}`);
+        setLoadingPlan(null);
+      });
+
       rzp.open();
-
-      setLoadingPlan(null);
     } catch (error) {
-      console.log(error);
-
+      console.error("Payment initiation error:", error);
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Could not initiate payment. Please try again.";
+      alert(errorMsg);
       setLoadingPlan(null);
     }
   };
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-emerald-50 py-16 px-6">
       <div className="max-w-6xl mx-auto mb-14 flex items-start gap-4">
         <button
           onClick={() => navigate("/")}
-          className="mt-2 p-3 rounded-full bg-white shadow hover:shadow-md transition"
+          className="mt-2 p-3 rounded-full bg-white shadow hover:shadow-md transition cursor-pointer"
         >
           <FaArrowLeft className="text-gray-600" />
         </button>
@@ -130,6 +206,9 @@ function Pricing() {
 
           <p className="text-gray-500 mt-3 text-lg">
             Flexible pricing to match your interview preparation goals.
+          </p>
+          <p className="text-emerald-700 font-medium text-sm mt-1 bg-emerald-100/70 inline-block px-4 py-1 rounded-full">
+            ⚡ Each mock interview session costs exactly 50 credits
           </p>
         </div>
       </div>
@@ -153,13 +232,13 @@ function Pricing() {
               `}
             >
               {plan.badge && (
-                <div className="absolute top-6 right-6 bg-emerald-600 text-white text-xs px-4 py-1 rounded-full shadow">
+                <div className="absolute top-6 right-6 bg-emerald-600 text-white text-xs px-4 py-1 rounded-full shadow font-semibold">
                   {plan.badge}
                 </div>
               )}
 
               {plan.default && (
-                <div className="absolute top-6 right-6 bg-gray-200 text-gray-700 text-xs px-3 py-1 rounded-full">
+                <div className="absolute top-6 right-6 bg-gray-200 text-gray-700 text-xs px-3 py-1 rounded-full font-medium">
                   Default
                 </div>
               )}
@@ -173,7 +252,7 @@ function Pricing() {
                   {plan.price}
                 </span>
 
-                <p className="text-gray-500 mt-1">{plan.credits} Credits</p>
+                <p className="text-gray-500 mt-1 font-medium">{plan.credits} Credits</p>
               </div>
 
               <p className="text-gray-500 mt-4 text-sm leading-relaxed">
@@ -183,11 +262,12 @@ function Pricing() {
               <div className="mt-6 space-y-3 text-left">
                 {plan.features.map((feature, i) => (
                   <div key={i} className="flex items-center gap-3">
-                    <FaCheckCircle className="text-emerald-500 text-sm" />
+                    <FaCheckCircle className="text-emerald-500 text-sm flex-shrink-0" />
                     <span className="text-gray-700 text-sm">{feature}</span>
                   </div>
                 ))}
               </div>
+
               {!plan.default && (
                 <button
                   disabled={loadingPlan === plan.id}
@@ -200,19 +280,25 @@ function Pricing() {
                       handlePayment(plan);
                     }
                   }}
-                  className={`w-full mt-8 py-3 rounded-xl font-semibold transition ${
+                  className={`w-full mt-8 py-3 rounded-xl font-semibold transition cursor-pointer ${
                     isSelected
-                      ? "bg-emerald-600 text-white hover:opacity-90"
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-md"
                       : "bg-gray-100 text-gray-700 hover:bg-emerald-50"
-                  }`}
+                  } ${loadingPlan === plan.id ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
-                  {isSelected ? "Proceed to Pay" : "Select Plan"}
+                  {loadingPlan === plan.id
+                    ? "Processing..."
+                    : isSelected
+                    ? "Proceed to Pay"
+                    : "Select Plan"}
                 </button>
               )}
             </motion.div>
           );
         })}
       </div>
+
+      {showAuth && <AuthModel onClose={() => setShowAuth(false)} />}
     </div>
   );
 }

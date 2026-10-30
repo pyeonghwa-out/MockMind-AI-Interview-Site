@@ -11,6 +11,7 @@ import axios from "axios";
 import { ServerUrl } from "../App";
 import { useDispatch, useSelector } from "react-redux";
 import { setUserData } from "../redux/userSlice";
+import LowCreditModal from "./LowCreditModal";
 
 function Step1SetUp({ onStart }) {
   const {userData} = useSelector((state)=> state.user);
@@ -25,6 +26,7 @@ function Step1SetUp({ onStart }) {
   const [resumeText, setResumeText] = useState("");
   const [analysisDone, setAnalysisDone] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [showLowCreditModal, setShowLowCreditModal] = useState(false);
 
   const handleUploadResume = async () => {
     if (!resumeFile || analyzing) return;
@@ -60,41 +62,51 @@ function Step1SetUp({ onStart }) {
   };
 
   const handleStart = async () => {
-  setLoading(true);
-
-  try {
-    const result = await axios.post(
-      ServerUrl + "/api/interview/generate-questions",
-      {
-        role,
-        experience,
-        mode,
-        resumeText,
-        projects,
-        skills,
-      },
-      { withCredentials: true }
-    );
-
-    console.log(result.data);
-
-    if (userData) {
-      dispatch(
-        setUserData({
-          ...userData,
-          credits: result.data.creditsLeft,
-        })
-      );
+    if ((userData?.credits ?? 0) < 50) {
+      setShowLowCreditModal(true);
+      return;
     }
 
-    setLoading(false);
-    onStart(result.data);
+    setLoading(true);
 
-  } catch (error) {
-    console.log(error);
-    setLoading(false);
-  }
-};
+    try {
+      const result = await axios.post(
+        ServerUrl + "/api/interview/generate-questions",
+        {
+          role,
+          experience,
+          mode,
+          resumeText,
+          projects,
+          skills,
+        },
+        { withCredentials: true }
+      );
+
+      console.log(result.data);
+
+      if (userData) {
+        dispatch(
+          setUserData({
+            ...userData,
+            credits: result.data.creditsLeft ?? Math.max(0, (userData.credits || 50) - 50),
+          })
+        );
+      }
+
+      setLoading(false);
+      onStart(result.data);
+
+    } catch (error) {
+      console.log(error);
+      setLoading(false);
+      if (error.response?.data?.message?.toLowerCase().includes("credit")) {
+        setShowLowCreditModal(true);
+      } else {
+        alert(error.response?.data?.message || "Failed to start interview");
+      }
+    }
+  };
 
   return (
     <motion.div
@@ -281,13 +293,21 @@ function Step1SetUp({ onStart }) {
               disabled={!role || !experience || loading}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.95 }}
-              className="w-full disabled:bg-gray-600 bg-green-600 hover:bg-green-700 text-white py-3 rounded-full text-lg font-semibold transition duration-300 shadow-md"
+              className="w-full disabled:bg-gray-400 bg-green-600 hover:bg-green-700 text-white py-3 rounded-full text-lg font-semibold transition duration-300 shadow-md cursor-pointer"
             >
               {loading? "Starting..." : "Start Interview"}
             </motion.button>
+            <p className="text-xs text-center text-gray-500 mt-2">
+              Each interview costs 50 credits (Available: {userData?.credits || 0})
+            </p>
           </div>
         </motion.div>
       </div>
+      <LowCreditModal
+        isOpen={showLowCreditModal}
+        onClose={() => setShowLowCreditModal(false)}
+        credits={userData?.credits || 0}
+      />
     </motion.div>
   );
 }

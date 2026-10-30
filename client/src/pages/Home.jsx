@@ -22,11 +22,13 @@ import { HiSparkles } from "react-icons/hi";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import AuthModel from "../components/AuthModel";
+import LowCreditModal from "../components/LowCreditModal";
 import Footer from "../components/Footer";
 
 function Home() {
   const { userData } = useSelector((state) => state.user);
   const [showAuth, setShowAuth] = useState(false);
+  const [showLowCreditModal, setShowLowCreditModal] = useState(false);
   const navigate = useNavigate();
 
   return (
@@ -66,6 +68,10 @@ function Home() {
                     setShowAuth(true);
                     return;
                   }
+                  if ((userData?.credits ?? 0) < 50) {
+                    setShowLowCreditModal(true);
+                    return;
+                  }
                   navigate("/interview");
                 }}
                 whileHover={{ opacity: 0.9, scale: 1.03 }}
@@ -90,6 +96,16 @@ function Home() {
                 View History
               </motion.button>
             </div>
+
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="mt-4 text-sm font-medium text-gray-500 flex items-center justify-center gap-2"
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Each interview costs <span className="font-semibold text-emerald-600">50 credits</span>
+            </motion.p>
           </div>
           <div className="flex flex-col md:flex-row justify-center items-center gap-10 mb-28">
             {[
@@ -240,7 +256,7 @@ function Home() {
                 {
                   img: creditImg,
                   title: "Credits System",
-                  desc: "Unlock premium interview sessions and advanced features.",
+                  desc: "Unlock premium interview sessions. Each interview costs 50 credits.",
                 },
               ].map((mode, index) => (
                 <motion.div
@@ -279,6 +295,11 @@ function Home() {
         </div>
       </div>
       {showAuth && <AuthModel onClose={() => setShowAuth(false)} />}
+      <LowCreditModal
+        isOpen={showLowCreditModal}
+        onClose={() => setShowLowCreditModal(false)}
+        credits={userData?.credits || 0}
+      />
         <Footer />
     </div>
   );

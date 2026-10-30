@@ -274,6 +274,7 @@ projects, skills, and resume details.
     return res.status(200).json({
       interviewId: interview._id,
       userName: user.name,
+      creditsLeft: user.credits,
       ...interview.toObject(),
     });
   } catch (error) {
