@@ -13,7 +13,7 @@ const app = express();
 app.use(cors({
   origin: [
     "http://localhost:5173",
-    "https://mock-mind-ai-interview-site.vercel.app"
+    "https://mockmind-3z2t.onrender.com"
   ],
   credentials: true
 }));
