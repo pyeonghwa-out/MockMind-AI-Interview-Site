@@ -1,3 +1,4 @@
+
 import "dotenv/config";
 import express from "express";
 import connectDb from "./config/connectDb.js";
@@ -10,28 +11,29 @@ import paymentRouter from "./routes/payment.route.js";
 
 const app = express();
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://mockmind-3z2t.onrender.com"
+];
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://mockmind-3z2t.onrender.com"
-  ],
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-app.use(express.json())
-app.use(cookieParser())
+app.use(express.json());
+app.use(cookieParser());
 
-app.use("/api/auth", authRouter)
-app.use("/api/user", userRouter)
-app.use("/api/interview", interviewRouter)
-app.use("/api/payment", paymentRouter)
+app.use("/api/auth", authRouter);
+app.use("/api/user", userRouter);
+app.use("/api/interview", interviewRouter);
+app.use("/api/payment", paymentRouter);
 
+const PORT = process.env.PORT || 8000;
 
-
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=>{
-    console.log(`Running at port ${PORT}`);
-    connectDb()
-    
-})
+app.listen(PORT, () => {
+  console.log(`Running at port ${PORT}`);
+  connectDb();
+});
