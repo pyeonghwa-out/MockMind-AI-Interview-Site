@@ -73,7 +73,7 @@ Upload your resume, generate AI-powered interview questions tailored to your pro
 ## 💳 Razorpay Test Card
 
 ```text
-Card Number : 4111 1111 1111 1111
+Card Number : 4100 2800 0000 1007
 Expiry Date : Any Future Date
 CVV         : Any 3 Digits
 Name        : Any Name
